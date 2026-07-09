@@ -1,0 +1,9 @@
+# Hide secrets
+.streamlit/secrets.toml
+log.db
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment files
+.env

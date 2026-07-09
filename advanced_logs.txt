@@ -1,0 +1,20 @@
+2026-07-04 10:01:12 INFO User login success from 192.168.1.10
+2026-07-04 10:02:45 WARNING Failed login attempt from 192.168.1.15
+2026-07-04 10:03:10 WARNING Failed login attempt from 192.168.1.15
+2026-07-04 10:03:55 WARNING Failed login attempt from 192.168.1.15
+2026-07-04 10:04:30 ERROR Database connection timeout from 192.168.1.20
+2026-07-04 10:05:12 CRITICAL Multiple failed login attempts from 192.168.1.15
+2026-07-04 10:06:22 INFO File accessed from 192.168.1.11
+2026-07-04 10:07:45 ERROR Unauthorized access attempt from 10.0.0.5
+2026-07-04 10:08:30 WARNING Failed login attempt from 10.0.0.5
+2026-07-04 10:09:12 WARNING Failed login attempt from 10.0.0.5
+2026-07-04 10:10:55 CRITICAL System breach detected from 10.0.0.5
+2026-07-04 10:11:20 INFO User logout from 192.168.1.10
+2026-07-04 10:12:40 ERROR Suspicious API usage from 172.16.0.3
+2026-07-04 10:13:10 WARNING Failed login attempt from 172.16.0.3
+2026-07-04 10:14:05 WARNING Failed login attempt from 172.16.0.3
+2026-07-04 10:15:55 CRITICAL Data exfiltration detected from 172.16.0.3
+2026-07-04 10:16:22 INFO Normal browsing activity from 192.168.1.12
+2026-07-04 10:17:30 ERROR Malware signature detected from 8.8.8.8
+2026-07-04 10:18:40 CRITICAL Root access granted from 8.8.8.8
+2026-07-04 10:19:55 WARNING Failed login attempt from 8.8.8.8

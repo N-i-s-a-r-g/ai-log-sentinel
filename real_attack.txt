@@ -1,0 +1,10 @@
+2026-07-10 10:00:01 WARNING Failed login attempt from 192.168.1.10
+2026-07-10 10:00:02 WARNING Failed login attempt from 192.168.1.10
+2026-07-10 10:00:03 WARNING Failed login attempt from 192.168.1.10
+2026-07-10 10:00:04 WARNING Failed login attempt from 192.168.1.10
+2026-07-10 10:00:05 WARNING Failed login attempt from 192.168.1.10
+
+2026-07-10 10:01:10 ERROR Unauthorized access from 45.67.89.12
+2026-07-10 10:01:20 CRITICAL SQL Injection detected from 45.67.89.12
+
+2026-07-10 10:02:00 INFO Normal user login from 10.0.0.1

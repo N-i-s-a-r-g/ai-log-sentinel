@@ -1,0 +1,6 @@
+2026-06-28 10:14:22 [INFO] User login successful for admin from 192.168.1.50
+2026-06-28 10:15:01 [WARNING] Failed password for user attacker from 203.0.113.5
+2026-06-28 10:15:03 [WARNING] Failed password for user attacker from 203.0.113.5
+2026-06-28 10:16:40 [CRITICAL] Unauthorized root access attempt from 198.51.100.12
+2026-06-28 10:18:12 [INFO] System running normally
+2026-06-28 10:17:10 [WARNING] Failed password for user attacker from 203.0.113.5
