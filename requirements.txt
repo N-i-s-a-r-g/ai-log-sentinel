@@ -1,6 +1,6 @@
 streamlit
 pandas
-matplotlib==3.8.4
+matplotlib
 scikit-learn
 requests
 google-genai
