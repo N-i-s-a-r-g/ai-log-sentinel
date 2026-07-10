@@ -1,29 +1,87 @@
-import time
 from google import genai
+import json
+import streamlit as st
 
-def generate_ai_summary(df, api_key):
-
-    client = genai.Client(api_key=api_key)
-
-    logs_text = df.to_string(index=False)
-
-    prompt = f"""
-    Analyze logs and detect attacks:
-    {logs_text}
-    """
-
-    for attempt in range(3):  # 🔁 try 3 times
+def generate_ai_summary(df):
+    try:
+        # 🔑 Streamlit Secrets मधून सुरक्षितपणे की लोड करा
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            return response.text
+            api_key = st.secrets["GEMINI_API_KEY"]
+        except Exception:
+            return json.dumps({
+                "attack_type": "Error",
+                "suspicious_ip": "0.0.0.0",
+                "severity": "high",
+                "action": "monitor",
+                "confidence": 0,
+                "explanation": "🚨 API Key not found in Streamlit Secrets!"
+            })
 
-        except Exception as e:
-            if "503" in str(e):
-                time.sleep(3)  # ⏳ wait 3 sec
-            else:
-                return f"❌ AI Error: {str(e)}"
+        # ✅ नवीन अधिकृत पद्धतीने क्लायंट इनिशियलाइज करा
+        client = genai.Client(api_key=api_key)
 
-    return "❌ AI Busy — Try again later"
+        # 🔹 Take last logs (avoid huge input)
+        log_sample = df.tail(20).to_string(index=False)
+
+        prompt = f"""
+You are a cybersecurity AI.
+
+Analyze the following logs and return ONLY VALID JSON.
+
+LOG DATA:
+{log_sample}
+
+FORMAT:
+{{
+  "attack_type": "string",
+  "suspicious_ip": "string",
+  "severity": "low | medium | high",
+  "action": "monitor | block",
+  "confidence": number,
+  "explanation": "short human readable explanation"
+}}
+
+RULES:
+- MUST be valid JSON
+- MUST include commas
+- NO explanation outside JSON
+- NO markdown
+- DO NOT add extra text
+"""
+
+        # ✅ नवीन लायब्ररीनुसार योग्य मॉडेल कॉल पद्धत
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+
+        output = response.text.strip()
+
+        # 🔥 Remove markdown if exists
+        if output.startswith("```"):
+            output = output.replace("```json", "").replace("```", "").strip()
+
+        # 🔥 Try parsing JSON
+        try:
+            parsed = json.loads(output)
+            return json.dumps(parsed)
+        except Exception:
+            # fallback if AI breaks format
+            return json.dumps({
+                "attack_type": "Unknown",
+                "suspicious_ip": "0.0.0.0",
+                "severity": "low",
+                "action": "monitor",
+                "confidence": 50,
+                "explanation": "AI output was not in valid JSON format"
+            })
+
+    except Exception as e:
+        return json.dumps({
+            "attack_type": "Error",
+            "suspicious_ip": "0.0.0.0",
+            "severity": "low",
+            "action": "monitor",
+            "confidence": 0,
+            "explanation": str(e)
+        })
