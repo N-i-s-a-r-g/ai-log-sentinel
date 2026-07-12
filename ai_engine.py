@@ -1,87 +1,100 @@
-from google import genai
 import json
+import os
+
 import streamlit as st
+from google import genai
 
-def generate_ai_summary(df):
+
+def get_api_key() -> str:
+    # First try Streamlit Secrets
     try:
-        # 🔑 Streamlit Secrets मधून सुरक्षितपणे की लोड करा
-        try:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        except Exception:
-            return json.dumps({
-                "attack_type": "Error",
-                "suspicious_ip": "0.0.0.0",
-                "severity": "high",
-                "action": "monitor",
-                "confidence": 0,
-                "explanation": "🚨 API Key not found in Streamlit Secrets!"
-            })
+        key = st.secrets.get("GEMINI_API_KEY")
+        if key:
+            return str(key)
+    except Exception:
+        pass
 
-        # ✅ नवीन अधिकृत पद्धतीने क्लायंट इनिशियलाइज करा
+    # Then try environment variable for FastAPI deployment
+    key = os.getenv("GEMINI_API_KEY")
+
+    if not key:
+        raise RuntimeError(
+            "GEMINI_API_KEY was not found in Streamlit Secrets "
+            "or environment variables."
+        )
+
+    return key
+
+
+def generate_ai_summary(df) -> str:
+    try:
+        api_key = get_api_key()
         client = genai.Client(api_key=api_key)
 
-        # 🔹 Take last logs (avoid huge input)
         log_sample = df.tail(20).to_string(index=False)
 
         prompt = f"""
-You are a cybersecurity AI.
+You are a cybersecurity threat-analysis assistant.
 
-Analyze the following logs and return ONLY VALID JSON.
+Analyze every relevant log line and return ONLY a valid JSON array.
 
 LOG DATA:
 {log_sample}
 
-FORMAT:
-{{
-  "attack_type": "string",
-  "suspicious_ip": "string",
-  "severity": "low | medium | high",
-  "action": "monitor | block",
-  "confidence": number,
-  "explanation": "short human readable explanation"
-}}
+Each array item must follow this structure:
 
-RULES:
-- MUST be valid JSON
-- MUST include commas
-- NO explanation outside JSON
-- NO markdown
-- DO NOT add extra text
+[
+  {{
+    "attack_type": "string",
+    "suspicious_ip": "string",
+    "severity": "low, medium, or high",
+    "action": "monitor or block",
+    "confidence": 0.0,
+    "explanation": "short human-readable explanation"
+  }}
+]
+
+Rules:
+- Return a JSON array even when only one attack is found.
+- Confidence must be between 0 and 1.
+- Do not include Markdown.
+- Do not include text outside the JSON.
+- Do not invent an IP address.
+- Ignore normal activity unless it helps explain an attack.
 """
 
-        # ✅ नवीन लायब्ररीनुसार योग्य मॉडेल कॉल पद्धत
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
         )
 
-        output = response.text.strip()
+        output = (response.text or "").strip()
 
-        # 🔥 Remove markdown if exists
         if output.startswith("```"):
-            output = output.replace("```json", "").replace("```", "").strip()
+            output = (
+                output
+                .replace("```json", "")
+                .replace("```JSON", "")
+                .replace("```", "")
+                .strip()
+            )
 
-        # 🔥 Try parsing JSON
-        try:
-            parsed = json.loads(output)
-            return json.dumps(parsed)
-        except Exception:
-            # fallback if AI breaks format
-            return json.dumps({
-                "attack_type": "Unknown",
-                "suspicious_ip": "0.0.0.0",
-                "severity": "low",
-                "action": "monitor",
-                "confidence": 50,
-                "explanation": "AI output was not in valid JSON format"
-            })
+        parsed = json.loads(output)
 
-    except Exception as e:
-        return json.dumps({
-            "attack_type": "Error",
-            "suspicious_ip": "0.0.0.0",
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+
+        if not isinstance(parsed, list):
+            raise ValueError("Gemini did not return a JSON list.")
+
+        return json.dumps(parsed)
+
+    except Exception as error:
+        return json.dumps([{
+            "attack_type": "AI Engine Error",
+            "suspicious_ip": "N/A",
             "severity": "low",
             "action": "monitor",
             "confidence": 0,
-            "explanation": str(e)
-        })
+            "explanation": str(error),
+        }])

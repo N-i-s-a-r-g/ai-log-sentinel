@@ -1,47 +1,57 @@
-from fastapi import FastAPI
-from ai_engine import generate_ai_summary
-import pandas as pd
 import json
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+
+from ai_engine import generate_ai_summary
+
 
 app = FastAPI(
     title="AI Log Sentinel API",
-    version="1.0.0"
+    description="AI-powered cybersecurity log analysis API",
+    version="1.0.0",
 )
 
 
 @app.get("/")
 def home():
-    return {"status": "AI Log Sentinel API running"}
+    return {
+        "status": "AI Log Sentinel API running",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 
 @app.post("/analyze")
 def analyze_logs(logs: list[str]):
+    if not logs:
+        raise HTTPException(
+            status_code=400,
+            detail="No logs provided",
+        )
+
+    clean_logs = [
+        log.strip()
+        for log in logs
+        if isinstance(log, str) and log.strip()
+    ]
+
+    if not clean_logs:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid log lines provided",
+        )
+
     try:
-        if not logs:
-            return {
-                "logs_parsed": 0,
-                "ai_analysis": [],
-                "error": "No logs provided"
-            }
-
-        # Convert received logs into a DataFrame
-        df = pd.DataFrame({"message": logs})
-
-        # Send DataFrame to AI engine
+        df = pd.DataFrame({"message": clean_logs})
         summary = generate_ai_summary(df)
 
-        # Convert AI JSON string into Python data
         try:
             ai_json = json.loads(summary)
-
-            # Convert one attack object into a list
-            if isinstance(ai_json, dict):
-                ai_json = [ai_json]
-
-            # Ensure final format is always a list
-            elif not isinstance(ai_json, list):
-                ai_json = []
-
         except (json.JSONDecodeError, TypeError):
             ai_json = [{
                 "attack_type": "Unknown",
@@ -49,17 +59,22 @@ def analyze_logs(logs: list[str]):
                 "severity": "low",
                 "action": "monitor",
                 "confidence": 0,
-                "explanation": str(summary)
+                "explanation": str(summary),
             }]
 
+        if isinstance(ai_json, dict):
+            ai_json = [ai_json]
+
+        if not isinstance(ai_json, list):
+            ai_json = []
+
         return {
-            "logs_parsed": len(logs),
-            "ai_analysis": ai_json
+            "logs_parsed": len(clean_logs),
+            "ai_analysis": ai_json,
         }
 
     except Exception as error:
-        return {
-            "logs_parsed": 0,
-            "ai_analysis": [],
-            "error": str(error)
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {error}",
+        ) from error

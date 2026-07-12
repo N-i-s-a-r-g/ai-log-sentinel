@@ -2,11 +2,9 @@ import json
 import requests
 import re
 import time
-import random
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import requests
 from sklearn.ensemble import IsolationForest
 from parser_engine import parse_log_line
 from database import init_db, insert_log, fetch_logs
@@ -133,13 +131,6 @@ if uploaded_file:
     else:
         st.success("✅ System Safe")
 
-
-    if total_score > 15:
-        st.error("🚨 System Under Active Attack")
-    elif total_score > 5:
-        st.warning("⚠️ Suspicious Activity Detected")
-    else:
-        st.success("✅ System Safe") 
     # 🛡️ Attack Response System
     st.markdown("### 🛡️ Attack Response System")
     if total_score > 15:
@@ -231,11 +222,6 @@ if uploaded_file:
         """
 
         st.text_area("Report", report)
-    # 📧 AUTO EMAIL ONLY FOR HIGH RISK
-    if alerts and total_score > 10:
-        if user_email:
-            send_email_alert("\n".join(alerts), user_email)
-
     # 🔹 Brute Force Display
     st.markdown("### 🚨 Suspicious IP Detection")
 
@@ -250,24 +236,6 @@ if uploaded_file:
     danger_ip = df.groupby("ip")["score"].sum().sort_values(ascending=False)
     st.write(danger_ip.head(3))
     
-    # 🚫 AUTO BLOCK SYSTEM
-    st.markdown("### 🚫 Auto Blocking System")
-
-    BLOCK_THRESHOLD = 5  # you can tune this
-
-    ip_risk = df.groupby("ip")["score"].sum()
-    blocked_ips = ip_risk[ip_risk >= BLOCK_THRESHOLD]
-
-    if not blocked_ips.empty:
-        st.error("🚨 Auto-blocked IPs")
-        st.write(blocked_ips)
-
-    # Save blocked IPs to file
-        with open("blocked_ips.txt", "w") as f:
-            for ip in blocked_ips.index:
-                f.write(ip + "\n")
-    else:
-        st.success("✅ No IPs blocked")
     # Define threshold
     BLACKLIST_THRESHOLD = 5
     # Calculate IP risk
@@ -318,7 +286,11 @@ if uploaded_file:
 
     for ip in df["ip"].unique():
         try:
-            res = requests.get(f"https://ipinfo.io/{ip}/json")
+            res = requests.get(
+                f"https://ipinfo.io/{ip}/json",
+                timeout=5,
+            )
+            res.raise_for_status()
             data = res.json()
 
             if "loc" in data:
@@ -346,12 +318,27 @@ if uploaded_file:
     # Peak attack hour
     if "timestamp" in df.columns:
         peak_hour = df["timestamp"].dt.hour.value_counts().idxmax()
-        st.write(f"🔹 Peak Attack Hour: {peak_hour}:00")
+        valid_timestamps = df["timestamp"].dropna()
+        if not valid_timestamps.empty:
+            hourly_counts = valid_timestamps.dt.hour.value_counts()
+            peakhour = hourly_counts.idxmax()
+            st.write(f"🔹 Peak Attack Hour: {peak_hour}:00")
+        else:
+            st.info("No valid timestamps available for peak-hour analysis")
     # 🔹 Timeline
     st.markdown("### ⏱️ Attack Timeline")
-    if "timestamp" in df.columns:
-        timeline = df.groupby(df["timestamp"].dt.hour)["score"].sum()
+
+    valid_timestamps = df["timestamp"].dropna()
+
+    if not valid_timestamps.empty:
+        timeline_df = df[df["timestamp"].notna()].copy()
+        timeline = timeline_df.groupby(
+            timeline_df["timestamp"].dt.hour
+        )["score"].sum()
+
         st.line_chart(timeline)
+    else:
+        st.info("No valid timestamps available for timeline")
 
     # 🔹 AI (optional)
     if AI_AVAILABLE:
@@ -362,10 +349,18 @@ if uploaded_file:
 
                 logs_list = df["message"].tolist()
 
-                response = requests.post(
-                    "http://127.0.0.1:8000/analyze",
-                    json=logs_list
+                api_url = st.secrets.get(
+                    "FASTAPI_URL",
+                    "http://127.0.0.1:8000"
                 )
+
+                response = requests.post(
+                    f"{api_url}/analyze",
+                    json=logs_list,
+                    timeout=45
+                )
+
+                response.raise_for_status()
 
                 data = response.json()
                 ai_result = data.get("ai_analysis", [])
