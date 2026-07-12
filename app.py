@@ -1,5 +1,8 @@
 import json
+import requests
 import re
+import time
+import random
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -38,6 +41,7 @@ st.write("Threat Detection Dashboard")
 st.markdown("---")
 user_email = st.text_input("📧 Enter your email for alerts")
 uploaded_file = st.file_uploader("Upload log file", type=["txt"])
+mode = st.radio("Select Mode", ["Upload Logs", "Real-Time Monitoring"])
 
 if uploaded_file:
     lines = uploaded_file.read().decode().splitlines()
@@ -55,6 +59,14 @@ if uploaded_file:
             insert_log(result)
             
     df = pd.DataFrame(parsed_data)
+    
+    if mode == "Real-Time Monitoring":
+        st.warning("⚡ Real-Time Monitoring Mode (Simulated)")
+
+        for i in range(3):
+            st.write(f"🔴 Live analyzing logs... ({i+1})")
+            time.sleep(1)
+
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     if df.empty or "threat" not in df.columns:
         st.warning("⚠️ Logs not parsed correctly or unsupported format")
@@ -96,7 +108,14 @@ if uploaded_file:
     # 🔹 THREAT SCORE
     st.markdown("### ⚡ Threat Score")
     total_score = df["score"].sum() if "score" in df.columns else 0
+    st.markdown("### 🚨 Threat Level Meter")
 
+    if total_score > 10:
+        st.progress(100)
+    elif total_score > 5:
+        st.progress(60)
+    else:
+        st.progress(20)
     if total_score > 10:
         st.error(f"🔥 HIGH RISK SYSTEM ({total_score})")
     elif total_score > 5:
@@ -337,112 +356,80 @@ if uploaded_file:
     # 🔹 AI (optional)
     if AI_AVAILABLE:
         st.markdown("### 🤖 AI Threat Analysis")
+
         try:
             with st.spinner("AI Agent analyzing..."):
 
-                summary = generate_ai_summary(df)
-                
-                cleaned = summary.strip()
+                logs_list = df["message"].tolist()
 
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+                response = requests.post(
+                    "http://127.0.0.1:8000/analyze",
+                    json=logs_list
+                )
 
-                # 🔥 FIX BROKEN JSON (missing commas)
-                cleaned = re.sub(r'"\s*"', '", "', cleaned)
+                data = response.json()
+                ai_result = data.get("ai_analysis", [])
 
-                ai_data = json.loads(cleaned)
+                # 🔥 HANDLE STRING JSON
+                if isinstance(ai_result, str):
+                    try:
+                        ai_result = json.loads(ai_result)
+                    except:
+                        st.warning("⚠️ AI returned plain text")
+                        st.write(ai_result)
+                        ai_result = []
 
-                cleaned = summary.strip()
+                # ✅ SAFE PROCESSING
+                if isinstance(ai_result, list):
 
-                # 🔥 remove markdown if AI sends ```json
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+                    for item in ai_result:
+                        attack_type = item.get("attack_type") or "Unknown"
+                        ip = item.get("suspicious_ip") or "N/A"
+                        severity = (item.get("severity") or "low").lower()
+                        action = (item.get("action") or "monitor").lower()
+                        explanation = item.get("explanation") or "No explanation"
 
-                try:
-                    ai_data = json.loads(cleaned)
-                    st.markdown("### 📘 AI Explanation")
-                    st.info(ai_data.get("explanation", "No explanation available"))
-
-                    severity = ai_data.get("severity")
-                    action = ai_data.get("action")
-                    ip = ai_data.get("suspicious_ip")
-                    attack_type = ai_data.get("attack_type")
-                    confidence = ai_data.get("confidence", 80)
-
-                    # 🎯 Severity display
-                    if severity == "high":
-                        st.error(f"🚨 HIGH THREAT DETECTED\n\nIP: {ip}\n\nAttack: {attack_type}")
-                    elif severity == "medium":
-                        st.warning(f"⚠️ MEDIUM THREAT\n\nIP: {ip}")
-                    else:
-                        st.success("✅ LOW RISK SYSTEM")
-                    st.write(f"🎯 AI Confidence: {confidence}%")
-
-                    # 🚫 AUTO BLOCK (SMART)
-                    with open("ai_blocked_ips.txt", "a+") as f:
-                        f.seek(0)
-                        existing = f.read()
-
-                        if ip not in existing:
-                            f.write(ip + "\n")
-
-                        st.markdown("### 🚨 AI Response Engine")
-
-                        if action == "block":
-                            st.error(f"""
-                        🚫 **AI ACTION: BLOCK EXECUTED**
-
-                        - IP: `{ip}`
-                        - Attack: `{attack_type}`
-                        - Severity: `{severity.upper()}`
-                        """)
-
-                        elif action == "monitor":
-                            st.warning("👀 AI recommends monitoring this activity")
-
+                        confidence = item.get("confidence", 0)
+                        if confidence <= 1:
+                            confidence = int(confidence * 100)
                         else:
-                            st.success("✅ No action required")
-                    #🛡️ AI Action Panel
-                    st.markdown("### 🛡️ AI Action Panel")
+                            confidence = int(confidence)
 
-                    if action == "block":
-                        st.error("🚨 AI: BLOCK IMMEDIATELY")
+                        st.markdown("### 🧠 AI Decision Summary")
 
-                    elif severity == "medium":
-                        st.warning("⚠️ AI: Monitor system")
+                        st.write(f"Attack Type: {attack_type}")
+                        st.write(f"Suspicious IP: {ip}")
+                        st.write(f"Severity: {severity.upper()}")
+                        st.write(f"Action: {action.upper()}")
+                        st.write(f"Confidence: {confidence}%")
 
-                    else:
-                        st.success("✅ AI: System safe")
+                        st.markdown("### 📘 Explanation")
+                        st.info(explanation)
 
-                except:
-                    # fallback if AI gives text instead of JSON
-                    with st.expander("🔍 View Raw AI Output"):
-                         st.json(ai_data)
-                    st.markdown("### 🧠 AI Decision Summary")
+                        # 🎯 Severity UI
+                        if severity == "high":
+                            st.error(f"🚨 HIGH THREAT from {ip}")
+                        elif severity == "medium":
+                            st.warning(f"⚠️ MEDIUM THREAT from {ip}")
+                        else:
+                            st.success("✅ LOW RISK")
 
-                    st.write(f"**Attack Type:** {ai_data.get('attack_type')}")
-                    st.write(f"**Suspicious IP:** {ai_data.get('suspicious_ip')}")
-                    st.write(f"**Severity:** {ai_data.get('severity').upper()}")
-                    st.write(f"**Action:** {ai_data.get('action').upper()}")
-                    st.write(f"**Confidence:** {ai_data.get('confidence')}%")
+                        # 🚫 BLOCK
+                        if action == "block" and ip != "N/A":
+                            with open("ai_blocked_ips.txt", "a+") as f:
+                                f.seek(0)
+                                existing = f.read()
 
-                    st.markdown("### 📘 Explanation")
-                    st.info(ai_data.get("explanation"))
-                    
-                    decision = summary.lower()
+                                if ip not in existing:
+                                    f.write(ip + "\n")
 
-                    if "block" in decision or "high risk" in decision:
-                        st.error("🚨 AI: BLOCK IMMEDIATELY")
-                    elif "medium" in decision:
-                        st.warning("⚠️ AI: Monitor closely")
-                    else:
-                        st.success("✅ AI: System safe")
+                            st.error(f"🚫 AI BLOCKED IP: {ip}")
+
+                else:
+                    st.warning("⚠️ Unexpected AI format")
 
         except Exception as ai_err:
             st.warning(f"AI Error: {str(ai_err)}")
-    else:
-        st.info("AI module not enabled")
-
     # 🔹 DATABASE
     st.markdown("### 💾 Stored Logs (Database)")
     stored = fetch_logs()

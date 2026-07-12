@@ -4,3 +4,5 @@ matplotlib
 scikit-learn
 requests
 google-genai
+fastapi
+uvicorn
