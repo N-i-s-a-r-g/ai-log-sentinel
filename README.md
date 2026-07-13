@@ -96,6 +96,59 @@ Current Status:
 - SQLite
 - Matplotlib
 
+## 📸 Project Screenshots
+
+### Dashboard Overview
+
+![Dashboard](screenshots/dashboard.png)
+
+---
+
+### Total logs
+
+![Total Logs](screenshots/total_logs.png)
+
+### Parsed Log Analysis
+
+![Parsed Logs](screenshots/parsed_logs.png)
+
+---
+
+### Threat Detection and Alerts
+
+![Threat Analysis](screenshots/threat_analysis.png)
+![Threat Alerts](screenshots/alert.png)
+
+---
+
+### Automated IP Blocking
+
+![Auto Blocking](screenshots/autoblock.png)
+
+---
+
+### Threat Distribution
+
+![Threat Chart](screenshots/chart.png)
+
+---
+
+### Threat Breakdown and Top Attacker IPs
+
+![Threat Graphs](screenshots/graph.png)
+
+---
+
+### Attack Location Map
+
+![Attack Map](screenshots/attack_map.png)
+
+---
+
+### AI Threat Analysis
+
+![AI Analysis](screenshots/ai_analysis.png)
+
 ---
 
 ## ▶️ Run Locally
@@ -115,7 +168,7 @@ python -m uvicorn api_server:app --reload
 Run Dashboard:
 
 ```bash
-streamlit run app.py
+ python -m streamlit run app.py
 ```
 
 ---
